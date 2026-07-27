@@ -54,6 +54,11 @@ npm test                                   # sollte grün sein
 node server.js
 ```
 
+> Das `>>` hängt an: In der `.env` steht danach **zweimal** `APP_SECRET=`, oben
+> die leere Zeile aus der Vorlage, unten deine. Das ist in Ordnung — sowohl
+> dotenv als auch systemd nehmen die letzte. Wer aufräumen mag, löscht die
+> **obere**, leere.
+
 Beim ersten Start schreibt der Server einen **Einrichtungscode** ins Fenster:
 
 ```
@@ -83,6 +88,21 @@ Diese Seite aufrufen, Code eintippen, Betrieb und Inhaberkonto anlegen — ferti
 > `agent@example.com`. Sonst gehen später die Terminanfragen und der „Passwort
 > vergessen"-Link an ein Postfach, das es nicht gibt — und du kommst nicht mehr hinein.
 > Ändern lässt sich beides jederzeit unter „Konto", die Adresse nur gegen das Passwort.
+
+> **⚠️ Ohne Browser** — also wenn ein Agent die Einrichtung per `curl` macht —
+> geht das Formular ins Leere: `POST /einrichtung` antwortet **404**. Die Seite
+> schickt ihre Felder als JSON an `/api/einrichtung`:
+>
+> ```bash
+> curl -X POST https://deine-domain.de/api/einrichtung \
+>   -H 'content-type: application/json' \
+>   -d '{"code":"QRTM-4K7B","firma":"…","name":"…","email":"…","password":"…"}'
+> ```
+>
+> Antwort `{"ok":true,"slug":"…","einzelbetrieb":true}`. `einzelbetrieb` heißt:
+> Es ist der einzige selbstbetriebene Mandant, also zeigt die Apex-Adresse ihn
+> direkt — dafür ist **kein** `DEFAULT_TENANT` in der `.env` nötig, das steht in
+> der Datenbank.
 
 > **Warum überhaupt ein Code?** Eine frische Instanz ist leer. Ohne Nachweis könnte
 > der Erste, der die Adresse errät, den Betrieb anlegen und wäre der Inhaber. Der
@@ -196,6 +216,30 @@ brauchst deshalb einen **Wildcard-Eintrag** im DNS und ein **Wildcard-Zertifikat
 > **⚠️ Das geht nur über DNS-01**, nicht über HTTP-01. Let's Encrypt stellt Zertifikate
 > für `*.deine-domain.de` ausschließlich gegen einen DNS-TXT-Eintrag aus. Wenn dein
 > DNS-Anbieter keine API hat, wird das mühsam.
+>
+> Mit API läuft es unbeaufsichtigt, wenn du certbot zwei Haken mitgibst — einen,
+> der den TXT-Eintrag setzt, und einen, der ihn wieder wegräumt:
+>
+> ```bash
+> certbot certonly --manual --preferred-challenges dns \
+>   --manual-auth-hook '/root/dns-hook.sh auth' \
+>   --manual-cleanup-hook '/root/dns-hook.sh cleanup' \
+>   -d deine-domain.de -d '*.deine-domain.de'
+> ```
+>
+> certbot merkt sich beide in `/etc/letsencrypt/renewal/…conf`; die Verlängerung
+> läuft danach von selbst. **Prüf sie einmal** mit
+> `certbot renew --cert-name deine-domain.de --dry-run` — ein Haken, der nur beim
+> ersten Mal funktioniert, fällt sonst erst in 90 Tagen auf, wenn das Zertifikat
+> abgelaufen ist. Der Haken muss dem DNS Zeit zum Nachziehen lassen (ein `sleep`
+> von etwa 45 Sekunden nach dem Setzen des Eintrags); ohne das fragt Let's
+> Encrypt zu früh und die Prüfung scheitert.
+
+> **⚠️ nginx lädt nach der Verlängerung nicht von selbst neu** und arbeitet dann
+> bis zum nächsten Neustart mit dem abgelaufenen Zertifikat weiter — 90 Tage
+> nach einer scheinbar geglückten Einrichtung. Ein zweizeiliges Skript in
+> `/etc/letsencrypt/renewal-hooks/deploy/` (ausführbar, `systemctl reload nginx`)
+> erledigt das für alle Zertifikate der Maschine.
 
 ### Mailversand
 
@@ -280,8 +324,15 @@ stündlich. Die Zugangsdaten liegen verschlüsselt in der Datenbank (AES-256-GCM
 > so einmal ein Drittel der Aufträge — ohne jede Fehlermeldung.
 
 Richtig ist `sqlite3 "$DB" ".backup '$ZIEL'"`; das nimmt das WAL mit und funktioniert bei
-laufendem Server. Eine Vorlage liegt in `sicherung-beispiel.sh`. **Spiel eine Sicherung
-einmal zurück** — eine ungeprobte Sicherung ist eine Vermutung.
+laufendem Server. Eine Vorlage liegt in `sicherung-beispiel.sh` — `APP_DIR` und
+`BACKUP_DIR` anpassen, ausführbar machen und in die Crontab hängen:
+
+```
+# /etc/cron.d/putzflow-sicherung
+20 3 * * * root /opt/putzflow/sicherung.sh >> /var/log/putzflow-sicherung.log 2>&1
+```
+
+**Spiel eine Sicherung einmal zurück** — eine ungeprobte Sicherung ist eine Vermutung.
 
 Mit zu sichern: die Datenbank, `data/belege`, `data/fotos` **und die `.env`**.
 

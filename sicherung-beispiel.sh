@@ -48,6 +48,16 @@ if [ "$LIVE" != "$KOPIE" ]; then
   echo "Plausibilität: live $LIVE Aufträge, Kopie $KOPIE — Abbruch"; exit 1
 fi
 
+# ⚠️ Die Seitendateien der KOPIE wegräumen, bevor gezippt wird. `.backup`
+# erzeugt ein Ziel im WAL-Modus, also liegen daneben `<ziel>-wal` und
+# `<ziel>-shm`. `gzip` nimmt nur die Hauptdatei mit, die beiden bleiben
+# ungepackt liegen — und das Aufräumen unten sucht nach `*.sqlite.gz`, findet
+# sie also nie. Ergebnis: zwei Dateileichen pro Nacht, dauerhaft. Am
+# 27.07.2026 beim Nachbau nach dieser Anleitung aufgefallen.
+# Sie dürfen weg: Der integrity_check oben lief bereits durch, die Kopie ist
+# vollständig.
+rm -f "$ZIEL-wal" "$ZIEL-shm"
+
 gzip -f "$ZIEL"
 
 # --- 3. Dateien und Konfiguration ------------------------------------------
@@ -75,6 +85,10 @@ fi
 # --- 4. Aufräumen ----------------------------------------------------------
 find "$BACKUP_DIR" -name 'putzflow-*.sqlite.gz' -mtime +"$KEEP_DAYS" -delete
 find "$BACKUP_DIR" -name 'dateien-*.tar.gz'     -mtime +"$KEEP_DAYS" -delete
+# Seitendateien aus früheren Läufen (siehe oben) — räumt einmalig auf, was eine
+# ältere Fassung dieses Skripts hat liegen lassen.
+find "$BACKUP_DIR" -name 'putzflow-*.sqlite-wal' -delete
+find "$BACKUP_DIR" -name 'putzflow-*.sqlite-shm' -delete
 
 echo "Sicherung ok — $KOPIE Aufträge, $STAMP"
 
