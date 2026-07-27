@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neues Passwort · Putzflow</title>
+  <meta name="theme-color" content="#0f6fa8">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css?v=46">
+  <style>
+    .pw { max-width: 30rem; }
+    .pw h1 { font-size: 1.4rem; margin: 2rem 0 .3rem; }
+    .pw label { display: block; margin: 1rem 0 .2rem; font-weight: 500; }
+    .pw input { width: 100%; box-sizing: border-box; }
+    .pw .hilfe { color: var(--muted); font-size: .9rem; margin: .2rem 0 0; }
+    #fehler { background: #fdecea; border-left: 3px solid #b3261e; padding: .7rem .9rem; margin: 1rem 0; }
+    .fertig { background: var(--brand-soft); padding: 1.2rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+<div class="wrap pw">
+  <div class="marke gross" style="padding-top:2rem">
+    <img src="/img/logo/haken.svg" alt="" width="34" height="34">
+    <span>Putzflow</span>
+  </div>
+  <div id="inhalt"><p class="muted">Einen Moment …</p></div>
+  <p class="small muted" style="margin-top:2.5rem">
+    <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a>
+  </p>
+</div>
+<script>
+const el = document.getElementById('inhalt');
+const token = location.pathname.split('/').pop();
+
+async function api(pfad, body) {
+  const r = await fetch(pfad, body
+    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : undefined);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Das hat nicht geklappt.');
+  return j;
+}
+
+function abgelaufen(meldung) {
+  el.innerHTML = `<h1>Der Link gilt nicht mehr</h1>
+    <p class="muted">${meldung || 'Links zum Zurücksetzen gelten eine Stunde und lassen sich einmal verwenden.'}</p>
+    <p><a href="/">Zurück zur Anmeldung</a> — dort können Sie einen neuen anfordern.</p>`;
+}
+
+function formular(stand) {
+  el.innerHTML = `
+    <h1>Neues Passwort</h1>
+    <p class="muted">für ${stand.email}</p>
+    <form id="f">
+      <label for="pw">Neues Passwort</label>
+      <input id="pw" name="password" type="password" required minlength="8" autocomplete="new-password">
+      <p class="hilfe">Mindestens 8 Zeichen.</p>
+      <label for="pw2">Noch einmal</label>
+      <input id="pw2" type="password" required minlength="8" autocomplete="new-password">
+      <div id="fehler" hidden></div>
+      <p style="margin-top:1.2rem"><button type="submit" id="ab">Passwort setzen</button></p>
+    </form>
+    <p class="small muted">Sobald das neue Passwort gilt, werden alle offenen Anmeldungen
+    beendet — auf jedem Gerät.</p>`;
+
+  const f = document.getElementById('f');
+  const fehler = document.getElementById('fehler');
+  const knopf = document.getElementById('ab');
+  f.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    fehler.hidden = true;
+    // Die Wiederholung wird hier geprüft, nicht auf dem Server: Ein Vertipper
+    // ist kein Fehler der Anwendung, und der Token wäre danach verbraucht.
+    if (document.getElementById('pw').value !== document.getElementById('pw2').value) {
+      fehler.textContent = 'Die beiden Eingaben stimmen nicht überein.';
+      fehler.hidden = false;
+      return;
+    }
+    knopf.disabled = true;
+    try {
+      await api(`/api/passwort/${token}`, { password: document.getElementById('pw').value });
+      el.innerHTML = `<h1>Passwort gesetzt</h1>
+        <div class="fertig">
+          <p>Sie können sich jetzt mit dem neuen Passwort anmelden.</p>
+          <p><a href="/">Zur Anmeldung</a></p>
+        </div>`;
+    } catch (e) {
+      fehler.textContent = e.message;
+      fehler.hidden = false;
+      knopf.disabled = false;
+    }
+  });
+}
+
+// Erst fragen, ob der Link noch gilt — sonst tippt jemand ein Passwort und
+// erfährt danach, dass er umsonst war.
+api(`/api/passwort/${token}`).then(formular).catch(e => abgelaufen(e.message));
+</script>
+</body>
+</html>

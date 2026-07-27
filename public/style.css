@@ -1,0 +1,161 @@
+/* style.css — Design-Tokens + Grundlayout. Kein Build-Step, kein Framework. */
+:root {
+  /* Gulf-Livree: helles Blau und Orange. Das Hellblau trägt die Flächen, das
+     Orange setzt die Akzente — so wie auf dem Wagen: blauer Körper, oranger Streifen.
+     Für Knöpfe ein kräftigeres Blau, sonst reicht der Kontrast zu Weiß nicht. */
+  --bg: #eff5fa;
+  --surface: #ffffff;
+  --ink: #10222f;
+  --muted: #566a7b;
+  --line: #d5e4ef;
+  --brand: #0f6fa8;          /* Gulf-Blau, kräftig — Knöpfe, Links */
+  --brand-ink: #ffffff;
+  --brand-soft: #cfe7f4;     /* Gulf-Hellblau — Flächen, Banner */
+  --accent: #f26a21;         /* Gulf-Orange — Akzente, Hervorhebungen */
+  --ok: #15803d;
+  --warn: #9a6700;           /* Gold statt Orange, sonst mit dem Akzent verwechselbar */
+  --bad: #b91c1c;
+  --radius: 14px;
+  --shadow: 0 1px 2px #0f172a14, 0 4px 16px #0f172a0d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c1720; --surface: #13212c; --ink: #e6eef5; --muted: #90a5b6;
+    --line: #21323f; --brand: #4aa3d8; --brand-soft: #1b3547; --accent: #ff7a35;
+    --shadow: 0 1px 2px #0006;
+  }
+}
+/* Ohne eigene Regel greift das Browser-Standardblau — auf dunklem Grund
+   praktisch unlesbar. Hover in Gulf-Orange. */
+a { color: var(--brand); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:hover { color: var(--accent); }
+
+* { box-sizing: border-box; }
+/* ⚠️ Schriftgrößen-Untergrenze: 0,82 rem (≈13 px). Darunter war die Seite
+   vorher an mehreren Stellen — für ein Publikum aus Vermietenden um die 50 und
+   Reinigungskräften, die das am Telefon lesen, ist das zu klein. Wer eine neue
+   Größe einführt, bleibt darüber. */
+html, body { margin: 0; }
+body {
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--ink);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
+header.top {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .9rem 0 1.1rem;
+}
+header.top h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
+header.top .sub { color: var(--muted); font-size: .9rem; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 1rem; margin-bottom: .85rem;
+}
+.card h2 { margin: 0 0 .5rem; font-size: 1rem; }
+.row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+.muted { color: var(--muted); }
+.small { font-size: .92rem; }
+.date { font-weight: 600; }
+
+button, .btn {
+  font: inherit; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 10px; padding: .55rem .9rem; min-height: 44px;   /* Daumen-tauglich */
+}
+button.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+button.ghost { background: transparent; }
+button:disabled { opacity: .5; cursor: default; }
+
+input, select {
+  font: inherit; padding: .5rem .6rem; min-height: 44px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); color: var(--ink);
+}
+
+.pill { font-size: .82rem; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--line); }
+.pill.ok { color: var(--ok); border-color: currentColor; }
+.pill.warn { color: var(--warn); border-color: currentColor; }
+.pill.bad { color: var(--bad); border-color: currentColor; }
+.pill.premium { color: var(--accent); border-color: currentColor; font-weight: 600; }
+
+.bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: .4rem; }
+.bar > i { display: block; height: 100%; background: var(--brand); }
+.bar.warn > i { background: var(--warn); }
+.bar.over > i { background: var(--bad); }
+
+table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+th, td { text-align: left; padding: .4rem .3rem; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%);
+  background: var(--ink); color: var(--bg); padding: .6rem 1rem; border-radius: 10px;
+  box-shadow: var(--shadow); opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.toast.on { opacity: 1; }
+
+/* --- Monatskalender ---------------------------------------------------- */
+.cal-kopf, .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: .3rem; }
+.cal-kopf { font-size: .8rem; color: var(--muted); text-align: center; margin-bottom: .3rem; }
+.cal-tag, .cal-leer {
+  min-height: 3.1rem; border-radius: 9px; padding: .25rem .3rem;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.cal-tag { border: 1px solid var(--line); background: var(--surface); }
+.cal-heute { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.cal-nr { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-punkte { display: flex; flex-wrap: wrap; gap: 2px; }
+.cal-punkt { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.cal-leg { display: inline-flex; align-items: center; gap: .3rem; }
+.shots-rolle { font-size: .95rem; margin: 1.6rem 0 .2rem; color: var(--brand); }
+.shotgrid-kraft { grid-template-columns: 1fr; }
+.shotgrid-kraft .phone { flex-direction: row; align-items: flex-start; gap: 1.2rem; }
+.shotgrid-kraft .phone figcaption { text-align: left; max-width: 26rem; }
+@media (max-width: 46rem) { .shotgrid-kraft .phone { flex-direction: column; align-items: center; } }
+
+/* --- Checkliste --------------------------------------------------------- */
+.check { border-top: 1px solid var(--line); margin-top: .6rem; padding-top: .2rem; }
+.check-zeile {
+  display: flex; align-items: center; gap: .55rem; padding: .45rem 0;
+  border-bottom: 1px solid var(--line); font-size: .93rem;
+}
+.check-zeile:last-of-type { border-bottom: 0; }
+.check-zeile input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--brand); }
+.check-zeile > span { flex: 1; }
+.check-zeile.ist-fertig > span { color: var(--muted); text-decoration: line-through; }
+.check-zeile button.small { padding: .25rem .6rem; min-height: 32px; font-size: .84rem; }
+
+/* --- Hinweisleiste (Testzeitraum) -------------------------------------- */
+.hinweis {
+  margin: 0 0 .9rem; padding: .55rem .8rem; font-size: .88rem;
+  border-left: 4px solid var(--brand); background: var(--brand-soft); color: var(--ink);
+  border-radius: 0 8px 8px 0;
+}
+.hinweis-aus { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.btn.ghost.small, button.small {
+  display: inline-block; padding: .3rem .7rem; min-height: 34px; font-size: .86rem;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  color: var(--ink); text-decoration: none; font-weight: 600; cursor: pointer;
+}
+button.primary.small { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+
+/* Geplante, noch nicht geleistete Positionen im Stundenzettel: sichtbar, aber
+   erkennbar anders — sie stehen NICHT auf dem Zettel für die Lohnbuchhaltung. */
+tr.geplant td { color: var(--muted); font-style: italic; }
+
+
+
+/* Marke: Zeichen und Wort nebeneinander. Das Zeichen steht auf der Schriftlinie
+   der Überschrift, nicht mittig zum Block — sonst schwimmt es. */
+.marke { display: flex; align-items: center; gap: .5rem; }
+.marke h1 { margin: 0; }
+.marke.gross { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em;
+               color: var(--brand); padding: 1.4rem 0 0; }
+
+/* Kurze Begründung direkt am Feld statt gesammelt unter dem Formular — dort liest
+   sie niemand, und eine Erklärung ohne sichtbare Frage wirkt wie ein Fehler. */
+.warum { font-weight: 400; color: var(--muted); font-size: .82rem; }
