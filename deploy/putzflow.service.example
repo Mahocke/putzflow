@@ -1,0 +1,97 @@
+# putzflow.service — Vorlage für systemd.
+#
+#   sudo useradd --system --home /opt/putzflow --shell /usr/sbin/nologin putzflow
+#   sudo cp deploy/putzflow.service.example /etc/systemd/system/putzflow.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now putzflow
+#   sudo systemctl status putzflow        # läuft es?
+#   journalctl -u putzflow -n 50          # was hat es beim Start gesagt?
+#
+# ⚠️ Wenn der Dienst mehrfach hintereinander scheitert, verweigert systemd den
+# nächsten Start mit „Start request repeated too quickly" — auch nachdem du die
+# Ursache behoben hast. Das ist die Bremse unten, und sie ist gewollt. Weiter
+# geht es dann mit:
+#   sudo systemctl reset-failed putzflow && sudo systemctl start putzflow
+# Ohne diesen Schritt sucht man den Fehler an einer Stelle, die längst stimmt.
+#
+# ⚠️ Die letzte Zeile brauchst du beim ERSTEN Start: Dort steht der
+# Einrichtungscode für /einrichtung.
+#
+# Pfade unten anpassen (/opt/putzflow) und prüfen, dass data/ dem Dienstbenutzer
+# gehört:  sudo chown -R putzflow:putzflow /opt/putzflow/data
+
+[Unit]
+Description=Putzflow — Reinigungsplanung
+After=network-online.target
+Wants=network-online.target
+
+# ⚠️ StartLimit* gehören unter [Unit], NICHT unter [Service] — seit systemd 230.
+# Stehen sie im falschen Abschnitt, werden sie stillschweigend ignoriert: Der
+# Dienst startet, aber die Neustart-Bremse fehlt, und ein Dienst, der jede
+# Sekunde neu abstürzt, füllt das Protokoll, statt aufzugeben.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+User=putzflow
+Group=putzflow
+WorkingDirectory=/opt/putzflow
+
+# ⚠️ EnvironmentFile statt Environment-Zeilen: Sonst stünden Zugangsdaten in der
+# Unit-Datei, die für jeden lesbar ist. Die .env gehört dem Dienstbenutzer und
+# ist chmod 600.
+#
+# Das führende „-" heißt „fehlt sie, ist das kein Fehler" — Putzflow liest die
+# .env ohnehin selbst (dotenv). systemd bekommt sie nur, damit die Werte auch in
+# `systemctl show` und in Hilfsbefehlen stehen. ⚠️ systemds Parser ist strenger
+# als dotenv: mehrzeilige Werte kann er nicht, Werte mit „#" braucht er in
+# Anführungszeichen.
+EnvironmentFile=-/opt/putzflow/.env
+
+# ⚠️ `/usr/bin/env node` statt eines festen Pfades. systemd durchsucht selbst
+# KEIN PATH — hier stand `/usr/bin/node`, und auf einer Debian-Maschine mit Node
+# aus /usr/local/bin schlug der Start mit `status=203/EXEC` fehl. Das sieht nach
+# allem Möglichen aus, nur nicht nach einem falschen Pfad. `env` löst den Namen
+# über den PATH auf, den systemd dem Dienst mitgibt (/usr/local/bin ist darin).
+# Am 27.07.2026 auf einer frischen Installation reproduziert.
+#
+# ⚠️ Liegt dein Node in einem Home-Verzeichnis (nvm, fnm), reicht auch das nicht —
+# dann den vollen Pfad aus `command -v node` eintragen. Ein Dienstbenutzer ohne
+# Home hat kein nvm.
+ExecStart=/usr/bin/env node server.js
+
+# Nach einem Absturz neu starten (Bremse steht oben unter [Unit]).
+Restart=on-failure
+RestartSec=5s
+
+# --- Härtung -------------------------------------------------------------
+# Der Dienst braucht Schreibrechte auf genau einen Ordner: data/ (Datenbank,
+# Belege, Fotos, EINRICHTUNG.txt). Alles andere bleibt schreibgeschützt.
+#
+# ⚠️ ProtectSystem=strict macht auch /opt/putzflow schreibgeschützt — deshalb
+# ReadWritePaths. Ohne die Zeile startet der Dienst und stirbt beim ersten
+# Schreibversuch in die Datenbank („attempt to write a readonly database").
+#
+# ⚠️ Die .env bleibt damit absichtlich schreibgeschützt. Putzflow ändert seine
+# eigene Konfiguration nicht — das war einmal anders und ging schief: Die
+# Ersteinrichtung trug DEFAULT_TENANT selbst ein, scheiterte hier still, und
+# erst der NÄCHSTE Neustart warf den Betreiber mit „Unbekannter Mandant" hinaus.
+# Wer data/ hier erweitert, sollte sich dieselbe Frage stellen: Muss das
+# wirklich geschrieben werden, und merkt jemand, wenn es nicht klappt?
+ProtectSystem=strict
+ReadWritePaths=/opt/putzflow/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=no
+
+[Install]
+WantedBy=multi-user.target

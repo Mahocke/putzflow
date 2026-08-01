@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Putzflow">
+  <rect width="512" height="512" rx="112" fill="#0f6fa8"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(51 51) scale(6.4)">
+    <path d="M10 34 L24 48 L44 20" stroke="#ffffff" stroke-width="8"/>
+    <path d="M44 20 C 50 12, 57 11, 61 16" stroke="#f26a21" stroke-width="8"/>
+  </g>
+</svg>

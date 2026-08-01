@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ersteinrichtung · Putzflow</title>
+  <meta name="theme-color" content="#0f6fa8">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css?v=46">
+  <style>
+    .setup { max-width: 34rem; }
+    .setup h1 { font-size: 1.5rem; margin: 2rem 0 .3rem; }
+    .setup label { display: block; margin: 1rem 0 .2rem; font-weight: 500; }
+    /* Eingabefelder über die ganze Breite — auf dem Telefon ist ein halb breites
+       Feld für eine E-Mail-Adresse eine Zumutung. */
+    .setup input { width: 100%; box-sizing: border-box; }
+    .setup .hilfe { color: var(--muted); font-size: .9rem; margin: .2rem 0 0; }
+    .setup button { font-weight: 600; }
+    .code-hilfe { border-left: 3px solid var(--accent); padding: .1rem 0 .1rem .8rem; margin: 1rem 0 1.4rem; }
+    .code-hilfe code { display: block; margin-top: .4rem; font-size: .82rem;
+                       overflow-x: auto; white-space: nowrap; padding-bottom: .2rem; }
+    #fehler { background: #fdecea; border-left: 3px solid #b3261e; padding: .7rem .9rem; margin: 1rem 0; }
+    .fertig { background: var(--brand-soft); padding: 1.2rem; border-radius: 6px; }
+    .fertig .adresse { font-size: 1.1rem; font-weight: 600; word-break: break-all; }
+  </style>
+</head>
+<body>
+<div class="wrap setup">
+  <div class="marke gross" style="padding-top:2rem">
+    <img src="/img/logo/haken.svg" alt="" width="34" height="34">
+    <span>Putzflow</span>
+  </div>
+  <div id="inhalt"><p class="muted">Einen Moment …</p></div>
+  <p class="small muted" style="margin-top:2.5rem">
+    <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a>
+  </p>
+</div>
+<script>
+const el = document.getElementById('inhalt');
+
+async function api(pfad, body) {
+  const r = await fetch(pfad, body
+    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : undefined);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Das hat nicht geklappt.');
+  return j;
+}
+
+function formular(stand) {
+  el.innerHTML = `
+    <h1>Ersteinrichtung</h1>
+    <p class="muted">Diese Instanz läuft, hat aber noch keinen Betrieb. Das erledigen
+    wir jetzt — danach ist diese Seite geschlossen.</p>
+
+    <div class="code-hilfe">
+      <strong>Einrichtungscode</strong>
+      <p class="hilfe">Er stand beim Start des Servers im Fenster. Nicht mehr da?
+      Dann steht er in <code>data/EINRICHTUNG.txt</code> — oder im Protokoll:</p>
+      <code>journalctl -u putzflow | grep Einrichtungscode</code>
+    </div>
+
+    <form id="f" autocomplete="on">
+      <label for="code">Einrichtungscode</label>
+      <input id="code" name="code" required autocapitalize="characters" spellcheck="false"
+             placeholder="ABCD-2345" style="text-transform:uppercase">
+
+      <label for="firma">Name des Betriebs</label>
+      <input id="firma" name="firma" required autocomplete="organization"
+             placeholder="Ferienwohnungen Musterhof">
+      <p class="hilfe">${stand.einzelbetrieb
+        ? 'Steht später in der Anwendung und auf den Stundenzetteln.'
+        : 'Daraus wird auch die Adresse: <code>&lt;name&gt;.deine-domain.de</code>.'}</p>
+
+      <label for="name">Dein Name</label>
+      <input id="name" name="name" required autocomplete="name" placeholder="Anna Muster">
+
+      <label for="email">E-Mail-Adresse</label>
+      <input id="email" name="email" type="email" required autocomplete="email">
+      <p class="hilfe">Damit meldest du dich an. Es wird jetzt <strong>keine</strong> Mail
+      verschickt — Mailversand kann später eingerichtet werden.</p>
+
+      <label for="pw">Passwort</label>
+      <input id="pw" name="password" type="password" required minlength="8"
+             autocomplete="new-password">
+      <p class="hilfe">Mindestens 8 Zeichen. Es wird nur als Hash gespeichert und steht
+      in keinem Protokoll.</p>
+
+      <div id="fehler" hidden></div>
+      <p style="margin-top:1.4rem">
+        <button type="submit" id="ab">Betrieb anlegen</button>
+      </p>
+    </form>`;
+
+  const form = document.getElementById('f');
+  const fehler = document.getElementById('fehler');
+  const knopf = document.getElementById('ab');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    fehler.hidden = true;
+    knopf.disabled = true;
+    knopf.textContent = 'Einen Moment …';
+    try {
+      const daten = Object.fromEntries(new FormData(form).entries());
+      fertig(await api('/api/einrichtung', daten));
+    } catch (err) {
+      fehler.textContent = err.message;
+      fehler.hidden = false;
+      knopf.disabled = false;
+      knopf.textContent = 'Betrieb anlegen';
+    }
+  });
+}
+
+function fertig(r) {
+  el.innerHTML = `
+    <h1>Fertig.</h1>
+    <div class="fertig">
+      <p>Dein Betrieb ist angelegt. Hier geht es hinein:</p>
+      <p class="adresse"><a href="${r.url}">${r.url}</a></p>
+      <p class="small">Anmelden mit deiner E-Mail-Adresse und dem eben gewählten Passwort.</p>
+    </div>
+    ${r.einzelbetrieb ? `<p class="hilfe">Diese Instanz bedient genau einen Betrieb —
+      sie ist unter einer Adresse ohne Subdomain erreichbar. Du musst dafür nichts
+      eintragen: <code>${r.slug}</code> ist als selbst betrieben gekennzeichnet und wird
+      auch nach einem Neustart gefunden. Kommen später mehrere Betriebe auf eigenen
+      Subdomains dazu, gilt wieder der Name in der Adresse.</p>`
+    : ''}
+    <h2 style="margin-top:2rem;font-size:1.05rem">Und jetzt?</h2>
+    <ol class="muted">
+      <li><strong>Unterkünfte</strong> anlegen — oder Smoobu verbinden, dann kommen sie von dort.</li>
+      <li><strong>Checklisten</strong> hinterlegen, damit die Kräfte wissen, was zu tun ist.</li>
+      <li><strong>Team</strong>: Reinigungskräfte eintragen. Sie bekommen einen persönlichen
+          Link und brauchen weder App noch Passwort — dafür muss der Mailversand stehen
+          (<code>NOTIFY_CHANNELS=mail</code>).</li>
+    </ol>
+    <p class="small muted">Die Einrichtungsseite ist ab jetzt geschlossen.
+    <code>data/EINRICHTUNG.txt</code> wurde gelöscht.</p>`;
+}
+
+api('/api/einrichtung').then(stand => {
+  if (!stand.offen) {
+    el.innerHTML = `<h1>Schon eingerichtet</h1>
+      <p class="muted">Auf dieser Instanz gibt es bereits einen Betrieb. Weitere Konten
+      legt die Verwaltung im Reiter „Team" an.</p>`;
+    return;
+  }
+  formular(stand);
+}).catch(() => {
+  el.innerHTML = '<p class="muted">Der Server antwortet nicht.</p>';
+});
+</script>
+</body>
+</html>
