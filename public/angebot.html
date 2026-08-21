@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weitermachen · Putzflow</title>
+  <meta name="theme-color" content="#0f6fa8">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/style.css?v=46">
+  <style>
+    .angebot { max-width: 40rem; }
+    .angebot h1 { font-size: 1.6rem; margin: 2rem 0 .3rem; }
+    .weg { border-top: 1px solid var(--line); padding: 1.4rem 0; }
+    .weg h2 { font-size: 1.05rem; margin: 0 0 .3rem; }
+    .weg p { margin: 0 0 .8rem; color: var(--muted); }
+    .betrag { font-size: 1.5rem; font-weight: 600; }
+    .alt { text-decoration: line-through; color: var(--muted); font-weight: 400; font-size: 1rem; }
+    .frist { border-left: 3px solid var(--accent); padding-left: .7rem; margin: 1.2rem 0; }
+    .fertig { background: var(--brand-soft); padding: 1.2rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+<div class="wrap angebot">
+  <div id="inhalt"><p class="muted">Einen Moment …</p></div>
+  <p class="small muted" style="margin-top:2.5rem">
+    <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a> ·
+    Fragen? <a href="mailto:hallo@putzflow.de">hallo@putzflow.de</a>
+  </p>
+</div>
+<script>
+const token = location.pathname.split('/').pop();
+const el = document.getElementById('inhalt');
+const euro = c => (c / 100).toFixed(2).replace('.', ',') + ' €';
+const tag = iso => iso ? iso.split('-').reverse().join('.') : '';
+
+async function api(pfad, body) {
+  const r = await fetch(pfad, body
+    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+    : undefined);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Das hat nicht geklappt.');
+  return j;
+}
+
+function danke(modus, rabatt) {
+  el.innerHTML = `<h1>Danke — willkommen an Bord.</h1>
+    <div class="fertig">
+      <p>Wir haben Ihre Bestellung (${modus === 'yearly' ? 'jährlich' : 'monatlich'}${
+        rabatt ? `, ${rabatt} % Rabatt auf das erste Jahr` : ''}).
+      Die Rechnung kommt per Mail.</p>
+      <p><strong>Ihr Zugang läuft ohne Unterbrechung weiter</strong> — Sie müssen nichts tun.</p>
+    </div>`;
+}
+
+function zeige(a) {
+  if (a.bestellt_am) return danke(a.modus, 0);
+  const p = a.preis;
+
+  el.innerHTML = `
+    <h1>Machen Sie weiter?</h1>
+    <p class="muted">${a.betrieb} · Testzeitraum ${a.abgelaufen ? 'endete' : 'endet'} am ${tag(a.endet_am)}</p>
+
+    <div class="weg">
+      <h2>Ihr Preis</h2>
+      <p>${p.einheiten
+            ? `${p.einheiten} ${p.einheiten === 1 ? 'Unterkunft' : 'Unterkünfte'} zu
+               ${euro(p.satz_monat_cent)} je Unterkunft und Monat.`
+            : `${euro(p.satz_monat_cent)} je Unterkunft und Monat.`}
+         ${p.mindest_greift
+            ? `Es gilt der Mindestbetrag von ${euro(p.mindest_monat_cent)} im Monat
+               (ab ${p.mindest_ab_einheiten} Unterkünften rechnet es sich nach Anzahl).`
+            : ''}
+         Netto zzgl. MwSt., Zahlung auf Rechnung — keine Kreditkarte, keine Kündigungsfrist.</p>
+      <p><span class="betrag">${euro(p.monat_cent)}</span> <span class="muted">im Monat</span>
+         &nbsp;·&nbsp; jährlich <strong>${euro(p.jahr_cent)}</strong>
+         <span class="muted">— nur zehn Monate, zwei geschenkt</span></p>
+      <div class="row" style="gap:.5rem;flex-wrap:wrap">
+        <button class="primary" data-modus="yearly">Jährlich bestellen</button>
+        <button class="ghost" data-modus="monthly">Monatlich bestellen</button>
+      </div>
+    </div>
+
+    <p class="small muted">Sie möchten aufhören? Auch dann bleiben Ihre Daten sichtbar und
+       herunterladbar — melden Sie sich einfach in Ihrem Konto an.</p>`;
+
+  el.querySelectorAll('[data-modus]').forEach(b => b.addEventListener('click', async () => {
+    el.querySelectorAll('button').forEach(x => x.disabled = true);
+    try {
+      const r = await api(`/api/angebot/${token}/bestellen`, { modus: b.dataset.modus });
+      danke(r.modus, 0);
+    } catch (e) { alert(e.message); el.querySelectorAll('button').forEach(x => x.disabled = false); }
+  }));
+}
+
+api(`/api/angebot/${token}`)
+  .then(zeige)
+  .catch(e => { el.innerHTML = `<h1>Dieser Link gilt nicht mehr</h1>
+    <p class="muted">${e.message} Schreiben Sie uns an
+    <a href="mailto:hallo@putzflow.de">hallo@putzflow.de</a>, dann klären wir das kurz.</p>`; });
+</script>
+</body>
+</html>

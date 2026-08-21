@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Putzflow</title>
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+</head>
+<body>
+<div class="wrap">
+  <!-- Diese Seite ersetzt im quelloffenen Stand die Verkaufsseite von
+       putzflow.de. Sie ist absichtlich schmucklos: Die Apex-Domain einer
+       selbst betriebenen Instanz braucht keine Werbung, nur einen Wegweiser.
+       Ersetze sie durch das, was zu deinem Betrieb passt. -->
+  <div class="marke gross" style="padding-top:2rem">
+    <img src="/img/logo/haken.svg" alt="" width="38" height="38">
+    <span>Putzflow</span>
+  </div>
+
+  <div class="card" style="margin-top:1.5rem">
+    <h2>Diese Instanz läuft.</h2>
+    <p class="muted">Putzflow ist eingerichtet. Die Verwaltung eines Betriebs erreichst du
+    unter seiner eigenen Adresse — <code>&lt;betrieb&gt;.deine-domain.de</code>.</p>
+    <p class="small muted">Reinigungskräfte melden sich nicht an; sie bekommen einen
+    persönlichen Link per E-Mail.</p>
+  </div>
+
+  <!-- ⚠️ Dieser Kasten ist der einzige Weg hinein. Ohne die Verkaufsseite von
+       putzflow.de gibt es kein Anmeldeformular; wer ihn hier entfernt, hinterlässt
+       eine laufende, aber leere Instanz ohne sichtbaren Einstieg. Nach der
+       Einrichtung antwortet /einrichtung von selbst mit „schon eingerichtet". -->
+  <div class="card" style="margin-top:1rem">
+    <h2>Noch kein Betrieb angelegt?</h2>
+    <p class="muted"><a href="/einrichtung"><strong>Ersteinrichtung starten →</strong></a></p>
+    <p class="small muted">Dauert eine Minute: Betrieb benennen, Konto anlegen, fertig.
+    Du brauchst den Einrichtungscode, den der Server beim Start ausgegeben hat
+    (steht auch in <code>data/EINRICHTUNG.txt</code>).</p>
+  </div>
+
+  <footer style="color:var(--muted);font-size:.92rem;padding:2rem 0">
+    <a href="/impressum">Impressum</a> · <a href="/datenschutz">Datenschutz</a>
+  </footer>
+</div>
+</body>
+</html>

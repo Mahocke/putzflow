@@ -1,0 +1,61 @@
+# nginx-Vorlage für Putzflow.
+#
+#   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/putzflow
+#   sudo ln -s /etc/nginx/sites-available/putzflow /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# „deine-domain.de" überall ersetzen.
+
+# ⚠️ Der Wildcard ist Pflicht, nicht Kür: Jeder Betrieb wohnt auf einer eigenen
+# Subdomain (<betrieb>.deine-domain.de). Ohne *.deine-domain.de im DNS UND im
+# Zertifikat ist nur die Startseite erreichbar, die Anwendung selbst nicht.
+#
+# Ein Wildcard-Zertifikat geht ausschließlich über DNS-01:
+#   certbot certonly --preferred-challenges dns \
+#     -d deine-domain.de -d '*.deine-domain.de'
+# HTTP-01 kann das nicht. Hat dein DNS-Anbieter keine API, wird es mühsam.
+#
+# Ausnahme: Wer Putzflow für genau EINEN Betrieb betreibt, braucht das alles
+# nicht — dann genügt ein normales Zertifikat für einen Namen und
+# DEFAULT_TENANT=<betrieb> in der .env.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name deine-domain.de *.deine-domain.de;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name deine-domain.de *.deine-domain.de;
+
+    ssl_certificate     /etc/letsencrypt/live/deine-domain.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/deine-domain.de/privkey.pem;
+
+    # Fotos und Belege kommen vom Telefon und sind vorher schon verkleinert —
+    # 12 MB sind reichlich Luft. Der Standard (1 MB) wäre zu knapp.
+    client_max_body_size 12m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3990;
+
+        # ⚠️ Host durchreichen ist hier KEINE Formsache, sondern Fachlogik:
+        # Aus dem Host-Header liest Putzflow, WELCHER Betrieb gemeint ist.
+        # Ohne diese Zeile schickt nginx „127.0.0.1" weiter, jede Subdomain
+        # landet beim selben (oder gar keinem) Mandanten — und der Fehler sieht
+        # aus wie ein kaputtes Login.
+        proxy_set_header Host              $host;
+
+        # X-Forwarded-For, damit die Bremse gegen Massenanlage nicht alle
+        # Anfragen für dieselbe IP hält (der Server läuft mit trust proxy).
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_http_version 1.1;
+        proxy_read_timeout 120s;
+    }
+}
