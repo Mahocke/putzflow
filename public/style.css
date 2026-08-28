@@ -57,6 +57,12 @@ header.top .sub { color: var(--muted); font-size: .9rem; }
 .row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .spread { justify-content: space-between; }
 .muted { color: var(--muted); }
+
+/* The promotional notice has a permanently light background, including when
+   the rest of the page uses the dark colour scheme. Do not let it inherit the
+   light dark-mode text colours. */
+#aktion { color: #10222f; }
+#aktion .muted { color: #526b7d; }
 .small { font-size: .92rem; }
 .date { font-weight: 600; }
 
