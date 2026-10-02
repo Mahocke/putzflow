@@ -92,6 +92,7 @@ if (!process.env.APP_SECRET || process.env.APP_SECRET.length < 32) {
 init();
 
 const app = express();
+app.disable('x-powered-by');           // verrät sonst jedem, welche Software antwortet
 app.set('trust proxy', 1);
 
 // ⚠️ Express 4 kennt keine async-Routen. Wirft ein `async`-Handler, entsteht eine

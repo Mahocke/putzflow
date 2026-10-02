@@ -23,6 +23,7 @@ test('Antworten tragen die zentralen Browser-Sicherheitsheader', async (t) => {
       assert.equal(response.headers.get('x-frame-options'), 'DENY');
       assert.equal(response.headers.get('referrer-policy'), 'same-origin');
       assert.match(response.headers.get('permissions-policy'), /microphone=\(\)/);
+      assert.equal(response.headers.get('x-powered-by'), null);
       return;
     } catch {
       await new Promise(resolve => setTimeout(resolve, 50));
