@@ -120,6 +120,16 @@ for (const methode of ['get', 'post', 'put', 'patch', 'delete', 'all', 'use']) {
   )));
 }
 app.use(express.json({ limit: '256kb' }));
+// Browser-Sicherheitsgrenzen zentral setzen. Eine strikte CSP braucht zunächst
+// das Auslagern der bewusst eingebetteten Seitenskripte; die übrigen Header
+// sind dagegen kompatibel und verhindern MIME-Sniffing sowie Einbettung.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+  next();
+});
 app.use(attachTenant);
 app.use(auth.attachUser);
 app.use(schreibsperre);

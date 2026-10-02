@@ -5,6 +5,9 @@
 const TOKEN = location.pathname.split('/').filter(Boolean)[1] || '';
 const API = `/api/m/${TOKEN}`;
 const $ = s => document.querySelector(s);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
 
 let state = null;
 
@@ -38,7 +41,8 @@ async function load() {
     state = await api('');
     render();
   } catch (e) {
-    $('#content').innerHTML = `<div class="card"><p>${e.message}</p></div>`;
+    $('#content').innerHTML = '<div class="card"><p></p></div>';
+    $('#content p').textContent = e.message;
   }
 }
 
@@ -80,7 +84,7 @@ function jobCard(j) {
       ${liste.map(i => `
         <label class="check-zeile${i.done ? ' ist-fertig' : ''}">
           <input type="checkbox" data-check="${i.item_id}" data-job="${j.id}"${i.done ? ' checked' : ''}>
-          <span>${i.text}</span>
+          <span>${esc(i.text)}</span>
           ${i.wants_photo ? (i.has_photo
             ? '<span class="pill ok">Foto ✓</span>'
             : `<button class="ghost small" data-foto="${i.item_id}" data-job="${j.id}">Foto</button>`) : ''}
@@ -95,7 +99,7 @@ function jobCard(j) {
       <span class="date">${fmtDate(j.date)}${j.time ? ' · ' + j.time : ''}${past && j.status !== 'done' ? ' <span class="pill bad">überfällig</span>' : ''}</span>
       ${badge}
     </div>
-    <div class="small muted">${j.unit || '—'}${j.note ? ' · ' + j.note : ''}</div>
+    <div class="small muted">${esc(j.unit || '—')}${j.note ? ' · ' + esc(j.note) : ''}</div>
     <div class="small muted">${j.minutes ? hhmm(j.minutes) + ' · ' : ''}${payLabel(j)}</div>
     ${j.running ? '<div class="small" style="color:var(--brand)">⏱ läuft …</div>' : ''}
     ${checkHtml}
