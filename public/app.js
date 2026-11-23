@@ -7,6 +7,14 @@ let me = null, tenant = null, users = [], tab = 'jobs';
 // Termins, um vor dem Zuteilen über die Grenze warnen zu können.
 let letzteJobs = [];
 
+// ⚠️ Alles, was nicht aus diesem Quelltext stammt, geht durch esc(), bevor es in
+// innerHTML landet: Namen, Notizen, Beschreibungen, Fehlertexte. Die Kraft schreibt
+// über ihren Magic-Link Auslagen und Urlaubsnotizen, die hier in der Verwaltung
+// erscheinen — ungeprüft wäre das ein Weg, Code in der Sitzung der Chefin auszuführen.
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
+
 const fmtDate = iso => new Date(iso + 'T12:00:00Z')
   .toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 const euro = c => (c / 100).toFixed(2).replace('.', ',') + ' €';
@@ -65,10 +73,10 @@ function frage({ titel, text, wege }) {
     const d = document.createElement('dialog');
     d.className = 'frage';
     d.innerHTML = `
-      <h3>${titel}</h3>
-      ${text ? `<p class="small muted" style="margin:.2rem 0 .6rem">${text}</p>` : ''}
+      <h3>${esc(titel)}</h3>
+      ${text ? `<p class="small muted" style="margin:.2rem 0 .6rem">${esc(text)}</p>` : ''}
       ${wege.map(w => `<button class="weg ${w.klasse || 'ghost'}" data-weg="${w.key}">
-           <b>${w.titel}</b><span>${w.warum}</span></button>`).join('')}
+           <b>${esc(w.titel)}</b><span>${esc(w.warum)}</span></button>`).join('')}
       <button class="ghost weg" data-weg="" style="margin-top:1rem">Abbrechen</button>`;
     document.body.appendChild(d);
     d.addEventListener('click', ev => {
@@ -120,7 +128,7 @@ function renderLogin(err, demo) {
     </div>` : ''}
     <form class="card" id="loginform">
       <h2>Anmelden</h2>
-      ${err ? `<p class="small" style="color:var(--bad)">${err}</p>` : ''}
+      ${err ? `<p class="small" style="color:var(--bad)">${esc(err)}</p>` : ''}
       <p><input name="email" type="email" placeholder="E-Mail" required style="width:100%"></p>
       <p><input name="password" type="password" placeholder="Passwort" required style="width:100%"></p>
       <button class="${demo ? 'ghost' : 'primary'}" type="submit">Anmelden</button>
@@ -161,7 +169,7 @@ function renderLogin(err, demo) {
       // Alles andere machte aus dem Formular ein Kundenverzeichnis.
       const r = await api('/api/passwort/vergessen', { email: f.get('email') });
       $('#vergessenkarte').innerHTML = `<h2>Mail unterwegs</h2>
-        <p class="small muted">${r.hinweis}</p>`;
+        <p class="small muted">${esc(r.hinweis)}</p>`;
     } catch (e) { toast(e.message); }
   });
   $('#loginform').addEventListener('submit', async ev => {
@@ -196,7 +204,7 @@ async function renderJobs() {
   const opts = u => crew.map(x => {
     const rest = x.minijob ? ` — noch ${euro(x.minijob.remaining_cents)}` : '';
     const warn = x.minijob && x.minijob.level === 'over' ? ' ⚠' : '';
-    return `<option value="${x.id}"${x.id === u ? ' selected' : ''}>${x.name}${rest}${warn}</option>`;
+    return `<option value="${x.id}"${x.id === u ? ' selected' : ''}>${esc(x.name)}${rest}${warn}</option>`;
   }).join('');
 
   // Warnung, wenn dieser Termin die zugeteilte Kraft über die Grenze trüge.
@@ -204,10 +212,10 @@ async function renderJobs() {
     const who = crew.find(x => x.id === j.assigned_user_id);
     if (!who || !who.minijob) return '';
     if (who.minijob.level === 'over') {
-      return `<div class="small" style="color:var(--bad)">⚠ ${who.name} liegt über der ${euro(who.minijob.limit_cents)}-Grenze</div>`;
+      return `<div class="small" style="color:var(--bad)">⚠ ${esc(who.name)} liegt über der ${euro(who.minijob.limit_cents)}-Grenze</div>`;
     }
     if (j.status !== 'done' && j.pay.cents > who.minijob.remaining_cents) {
-      return `<div class="small" style="color:var(--warn)">⚠ Dieser Termin bringt ${who.name} über die Grenze — nur noch ${euro(who.minijob.remaining_cents)} frei</div>`;
+      return `<div class="small" style="color:var(--warn)">⚠ Dieser Termin bringt ${esc(who.name)} über die Grenze — nur noch ${euro(who.minijob.remaining_cents)} frei</div>`;
     }
     return '';
   };
@@ -249,7 +257,7 @@ async function renderJobs() {
            <span class="small muted">Kommt als offener Termin zurück und muss neu angefragt werden.</span>
          </div>`
       : j.status === 'done'
-      ? `<div class="small muted">von ${j.user_name || '—'}</div>`
+      ? `<div class="small muted">von ${esc(j.user_name || '—')}</div>`
       : `<div class="row" style="margin-top:.6rem">
            <select data-assign="${j.id}">
              <option value="">— niemand —</option>${opts(j.assigned_user_id)}
@@ -259,23 +267,23 @@ async function renderJobs() {
            <button data-absagen="${j.id}" class="ghost" title="Die Reinigung fällt weg — nicht zu verwechseln mit dem Wechsel der Kraft">Absagen</button>
          </div>
          ${budgetHint(j)}
-         ${j.rundruf_offen ? `<div class="small" style="color:var(--warn)">Rundruf läuft — angefragt: ${j.rundruf_offen}</div>` : ''}`;
+         ${j.rundruf_offen ? `<div class="small" style="color:var(--warn)">Rundruf läuft — angefragt: ${esc(j.rundruf_offen)}</div>` : ''}`;
 
     return `<div class="card">
       <div class="row spread">
-        <span class="date">${fmtDate(j.due_date)}${j.start_time ? ' · ' + j.start_time : ''} ${j.premium ? '<span class="pill premium">Zuschlag</span>' : ''}</span>
+        <span class="date">${fmtDate(j.due_date)}${j.start_time ? ' · ' + esc(j.start_time) : ''} ${j.premium ? '<span class="pill premium">Zuschlag</span>' : ''}</span>
         ${badge}
       </div>
       <div class="small muted">${j.kind === 'aufgabe'
-        ? `<strong>${j.titel}</strong>${j.unit_name ? ' · ' + j.unit_name : ''} <span class="pill">Aufgabe</span>`
-        : (j.unit_name || '—')} · ${payLabel(j.pay)}${j.pay.minutes ? ' · ' + hhmm(j.pay.minutes) : ''}</div>
+        ? `<strong>${esc(j.titel)}</strong>${j.unit_name ? ' · ' + esc(j.unit_name) : ''} <span class="pill">Aufgabe</span>`
+        : esc(j.unit_name || '—')} · ${payLabel(j.pay)}${j.pay.minutes ? ' · ' + hhmm(j.pay.minutes) : ''}</div>
       ${controls}
     </div>`;
   }).join('');
 
   // Termin von Hand: telefonisch gebucht, Mitarbeiter übernachtet, Familienbesuch —
   // oder eine Sonderaufgabe, die mit keiner Buchung zu tun hat.
-  const unitOpts = (aktiveUnits || []).map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  const unitOpts = (aktiveUnits || []).map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
   const anlegen = `<details class="card" id="neu">
     <summary><strong>Termin von Hand anlegen</strong></summary>
     <p class="small muted">Für Buchungen, die nicht in Smoobu stehen — und für
@@ -402,7 +410,7 @@ async function renderMonth() {
     const titel = jobs.length
       ? jobs.map(j => `${j.unit_name || '?'} — ${DAY_STATUS[jobStatusKey(j)].text}${j.user_name ? ' (' + j.user_name + ')' : ''}`).join('\n')
       : '';
-    zellen.push(`<div class="cal-tag${iso === heuteIso ? ' cal-heute' : ''}"${titel ? ` title="${titel.replace(/"/g, '&quot;')}"` : ''}>
+    zellen.push(`<div class="cal-tag${iso === heuteIso ? ' cal-heute' : ''}"${titel ? ` title="${esc(titel)}"` : ''}>
       <span class="cal-nr">${d}</span>
       <span class="cal-punkte">${punkte}</span>
     </div>`);
@@ -440,7 +448,7 @@ async function renderTeam() {
     Kraft weiß also nichts von ihrem Termin — bitte kurz nachfassen.</p>
     <ul class="small muted" style="margin:0;padding-left:1.1rem">
       ${zustellung.probleme.slice(0, 5).map(pr => `<li>${new Date(pr.created_at.replace(' ', 'T') + 'Z').toLocaleString('de-DE')}
-        — ${pr.subject || 'Nachricht'} <span style="color:var(--bad)">(${pr.error || 'nicht zugestellt'})</span></li>`).join('')}
+        — ${esc(pr.subject || 'Nachricht')} <span style="color:var(--bad)">(${esc(pr.error || 'nicht zugestellt')})</span></li>`).join('')}
       ${zustellung.anzahl > 5 ? `<li>… und ${zustellung.anzahl - 5} weitere</li>` : ''}
     </ul>
   </div>` : '';
@@ -454,13 +462,13 @@ async function renderTeam() {
 
   const karte = u => `<div class="card">
     <div class="row spread">
-      <h2>${u.name}${u.silent ? ' <span class="pill">still</span>' : ''}${u.active ? '' : ' <span class="pill bad">stillgelegt</span>'}${
+      <h2>${esc(u.name)}${u.silent ? ' <span class="pill">still</span>' : ''}${u.active ? '' : ' <span class="pill bad">stillgelegt</span>'}${
         u.unerreichbar ? ' <span class="pill bad">nicht erreichbar</span>' : ''}</h2>
       ${budget(u)}
     </div>
     <form class="row" data-person="${u.id}" style="margin-top:.5rem;flex-wrap:wrap">
-      <label class="small muted">Name <input name="name" value="${u.name}" style="min-width:9rem"></label>
-      <label class="small muted">E-Mail <input name="email" type="email" value="${u.email || ''}" style="min-width:12rem"></label>
+      <label class="small muted">Name <input name="name" value="${esc(u.name)}" style="min-width:9rem"></label>
+      <label class="small muted">E-Mail <input name="email" type="email" value="${esc(u.email)}" style="min-width:12rem"></label>
       <label class="small muted">Beschäftigung
         <select name="employment">${Object.entries(ARTEN).map(([k, l]) =>
           `<option value="${k}"${(u.employment || 'minijob') === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
@@ -469,12 +477,12 @@ async function renderTeam() {
       <button class="ghost" type="submit">Speichern</button>
     </form>
     ${u.unerreichbar ? `<p class="small" style="color:var(--bad);margin:.4rem 0 0">
-      ⚠️ Ohne E-Mail-Adresse bekommt ${u.name} <strong>keine Terminanfragen</strong> — Zuteilungen
+      ⚠️ Ohne E-Mail-Adresse bekommt ${esc(u.name)} <strong>keine Terminanfragen</strong> — Zuteilungen
       laufen dann ins Leere. Entweder eine Adresse eintragen, oder „still" setzen und den Link
       unten selbst weitergeben (dann erwartet Putzflow auch keine Zusage mehr).</p>` : ''}
     <div class="row small muted" style="margin-top:.4rem">
       ${u.magic_url
-        ? `<button class="ghost small" data-copy="${u.magic_url}">Link kopieren</button>
+        ? `<button class="ghost small" data-copy="${esc(u.magic_url)}">Link kopieren</button>
            <span>Diesen Link bekommt sie — kein Konto, kein Passwort.</span>`
         : '<span>Still: kein Zugang, keine Nachrichten.</span>'}
     </div>
@@ -511,7 +519,7 @@ async function renderUnits() {
     <div class="small muted" style="margin:.6rem 0 .2rem">Checkliste — ${hinweis}</div>
     ${items.length ? items.map(i => `
       <form class="row check-edit" data-edititem="${i.id}">
-        <input name="text" value="${i.text.replace(/"/g, '&quot;')}" style="flex:1;min-width:11rem">
+        <input name="text" value="${esc(i.text)}" style="flex:1;min-width:11rem">
         <label class="small muted row" style="gap:.3rem"><input type="checkbox" name="foto"${i.wants_photo ? ' checked' : ''}> Foto</label>
         <button class="ghost small" type="submit">Speichern</button>
         <button class="ghost small" type="button" data-delitem="${i.id}">entfernen</button>
@@ -529,7 +537,7 @@ async function renderUnits() {
       <div class="row spread"><h2>Smoobu</h2>
         ${sm.verbunden ? '<span class="pill ok">verbunden</span>' : '<span class="pill">nicht verbunden</span>'}</div>
       ${sm.verbunden ? `
-        <p class="small muted">Schlüssel ${sm.key_maskiert} · letzter Abgleich:
+        <p class="small muted">Schlüssel ${esc(sm.key_maskiert)} · letzter Abgleich:
           ${sm.zuletzt ? new Date(sm.zuletzt).toLocaleString('de-DE') : 'noch keiner'}</p>
         <div class="row">
           <button class="primary" id="sync">Jetzt abgleichen</button>
@@ -546,7 +554,7 @@ async function renderUnits() {
         Spontanbuchung für morgen ist das der Unterschied zwischen einer informierten
         Reinigungskraft und einer verpassten Reinigung.</p>
         <div class="row" style="flex-wrap:wrap">
-          <input id="wh-url" readonly value="${sm.webhook_url}"
+          <input id="wh-url" readonly value="${esc(sm.webhook_url)}"
                  style="min-width:20rem;flex:1;font-family:monospace;font-size:.8rem">
           <button class="ghost" id="wh-kopieren">Kopieren</button>
         </div>
@@ -568,7 +576,7 @@ async function renderUnits() {
         kein Secret mehr? Dann in Smoobu „Secret neu erzeugen": Der Schlüssel bleibt
         derselbe, nur das alte Secret gilt sofort nicht mehr.</p>
         ${sm.demo ? `
-        <form class="row" style="flex-wrap:wrap;margin-top:.5rem" onsubmit="return false">
+        <form class="row" style="flex-wrap:wrap;margin-top:.5rem">
           <input placeholder="API-Schlüssel" disabled style="min-width:14rem">
           <input placeholder="API-Secret" disabled style="min-width:14rem">
           <button class="primary" disabled>Verbinden</button>
@@ -588,7 +596,7 @@ async function renderUnits() {
       <p class="small muted">Wann darf frühestens gereinigt werden, wie lang ist ein Termin,
       und wie viel Zeit braucht die Kraft zwischen zwei Anschriften?</p>
       <form class="row" id="planung" style="margin-top:.5rem">
-        <label class="small muted">Check-out <input name="checkout_time" value="${u.tenant.checkout_time || '11:00'}" style="width:6rem"></label>
+        <label class="small muted">Check-out <input name="checkout_time" value="${esc(u.tenant.checkout_time || '11:00')}" style="width:6rem"></label>
         <label class="small muted">Termin (Min) <input name="slot_minutes" type="number" min="15" max="480" value="${u.tenant.slot_minutes || 60}" style="width:5.5rem"></label>
         <label class="small muted">Fahrzeit (Min) <input name="travel_minutes" type="number" min="0" max="480" value="${u.tenant.travel_minutes ?? 30}" style="width:5.5rem"></label>
         <label class="small muted">Abrechnung ab dem <input name="period_start_day" type="number" min="1" max="28" value="${u.tenant.period_start_day || 16}" style="width:4.5rem"></label>
@@ -619,10 +627,10 @@ async function renderUnits() {
     </div>
 
     ${u.units.map(x => `<div class="card">
-      <div class="row spread"><h2>${x.name}</h2></div>
+      <div class="row spread"><h2>${esc(x.name)}</h2></div>
       <form class="row" data-unit="${x.id}" style="margin:.3rem 0 .2rem">
-        <label class="small muted">Ort <input name="location" value="${x.location || ''}" placeholder="z. B. Lange Str. 54" style="min-width:11rem"></label>
-        <label class="small muted">Check-out <input name="checkout_time" value="${x.checkout_time || ''}" placeholder="${u.tenant.checkout_time || '11:00'}" style="width:6rem"></label>
+        <label class="small muted">Ort <input name="location" value="${esc(x.location)}" placeholder="z. B. Lange Str. 54" style="min-width:11rem"></label>
+        <label class="small muted">Check-out <input name="checkout_time" value="${esc(x.checkout_time)}" placeholder="${esc(u.tenant.checkout_time || '11:00')}" style="width:6rem"></label>
         <button class="ghost" type="submit">Speichern</button>
       </form>
       <p class="small muted" style="margin:0">Gleicher Ort = kein Fahrtpuffer zwischen zwei Reinigungen.</p>
@@ -645,7 +653,7 @@ function auslagenBlock(s) {
   if (!a || !a.posten.length) return '';
   const zeile = p => `<tr>
       <td>${fmtDate(p.date)}</td>
-      <td class="small muted">${p.beschreibung}
+      <td class="small muted">${esc(p.beschreibung)}
         ${p.beleg ? `<a class="small" href="/api/expenses/${p.id}/beleg" target="_blank">Beleg</a>`
                   : '<span class="small muted">(ohne Beleg)</span>'}</td>
       <td class="num">${p.minutes ? hhmm(p.minutes) : '—'}</td>
@@ -710,19 +718,19 @@ async function renderSheet() {
     const zeitZelle = i => {
       if (i.geplant) return '<span class="small muted">geplant</span>';
       if (i.zeiten && i.zeiten.length) {
-        return `<span class="small">${i.zeiten.map(z => `${z.von}–${z.bis}`).join(', ')}</span>
+        return `<span class="small">${i.zeiten.map(z => `${esc(z.von)}–${esc(z.bis)}`).join(', ')}</span>
                 <span class="small muted">${hhmm(i.minutes)}</span>`;
       }
-      return `<button class="ghost small" data-zeit="${i.job_id}" data-tag="${i.date}"
+      return `<button class="ghost small" data-zeit="${i.job_id}" data-tag="${esc(i.date)}"
                 style="color:var(--bad)">Zeit fehlt — nachtragen</button>`;
     };
     const rows = s.items.map(i => `<tr${i.geplant ? ' class="geplant"' : ''}>
-        <td>${fmtDate(i.date)}</td><td class="small muted">${i.unit || '—'}</td>
+        <td>${fmtDate(i.date)}</td><td class="small muted">${esc(i.unit || '—')}</td>
         <td class="num">${zeitZelle(i)}</td>
         <td class="num">${payLabel(i)}</td></tr>`).join('');
     const az = s.aufzeichnung;
     return `<div class="card">
-      <div class="row spread"><h2>${s.name} ${sigPille(s.signatur)}</h2>
+      <div class="row spread"><h2>${esc(s.name)} ${sigPille(s.signatur)}</h2>
         <strong title="geleistet">${euro(s.total_cents)}</strong></div>
       ${mj ? `<div class="bar ${mj.level === 'over' ? 'over' : mj.level === 'warn' ? 'warn' : ''}"><i style="width:${pct}%"></i></div>
       <div class="small muted">${mj.level === 'over' ? `⚠️ über der ${euro(mj.limit_cents)}-Grenze`
@@ -765,7 +773,7 @@ async function renderSheet() {
     (!s.signatur || s.signatur.zustand !== 'gueltig')).length;
   const fehlendeZeiten = data.sheets.reduce((n, s) => n + (s.aufzeichnung ? s.aufzeichnung.fehlend : 0), 0);
   $('#content').innerHTML = tabsHtml() +
-    `<div class="small muted" style="margin-bottom:.5rem">Periode ${data.period.start} – ${data.period.end}</div>` +
+    `<div class="small muted" style="margin-bottom:.5rem">Periode ${esc(data.period.start)} – ${esc(data.period.end)}</div>` +
     (cards || '<div class="card muted">Noch keine Einsätze.</div>') +
     `<form class="card" id="payroll">
       <h2>An die Lohnbuchhaltung senden</h2>
@@ -777,7 +785,7 @@ async function renderSheet() {
         im PDF sind sie rot vermerkt.</p>` : ''}
       <div class="row" style="margin-top:.5rem">
         <input name="email" type="email" placeholder="lohnbuchhaltung@kanzlei.de"
-               value="${data.payroll_email || ''}"${data.demo ? ' disabled' : ' required'} style="flex:1;min-width:14rem">
+               value="${esc(data.payroll_email)}"${data.demo ? ' disabled' : ' required'} style="flex:1;min-width:14rem">
         <button class="primary" type="submit"${data.demo ? ' disabled' : ''}>Senden</button>
       </div>
       ${data.demo ? `<p class="small" style="color:var(--warn);margin:.4rem 0 0">In der Demo
@@ -803,11 +811,11 @@ async function renderUrlaub() {
 
   const antragKarte = a => `<div class="card">
     <div class="row spread">
-      <h2>${a.user_name}</h2>
+      <h2>${esc(a.user_name)}</h2>
       <span class="pill warn">wartet auf Antwort</span>
     </div>
     <p style="margin:.3rem 0">${zeitraum(a)}</p>
-    ${a.note ? `<p class="small muted">Notiz: ${a.note}</p>` : ''}
+    ${a.note ? `<p class="small muted">Notiz: ${esc(a.note)}</p>` : ''}
     <div class="row" style="margin-top:.5rem;flex-wrap:wrap">
       <button class="primary" data-url-ja="${a.id}">Genehmigen</button>
       <button class="ghost" data-url-nein="${a.id}">Ablehnen</button>
@@ -821,7 +829,7 @@ async function renderUrlaub() {
     const k = p.konto;
     return `<div class="card">
       <div class="row spread">
-        <h2>${p.name}</h2>
+        <h2>${esc(p.name)}</h2>
         ${k ? `<span class="pill ${k.rest < 0 ? 'bad' : k.rest === 0 ? 'warn' : 'ok'}">${k.rest} von ${k.anspruch} frei</span>`
             : '<span class="muted small">kein Urlaubskonto</span>'}
       </div>
@@ -836,10 +844,10 @@ async function renderUrlaub() {
         bewusst geschehen.</p>` : ''}
       <form class="row" data-urlaub-person="${p.id}" style="margin-top:.4rem;flex-wrap:wrap">
         <label class="small muted">Urlaubstage/Jahr
-          <input name="vacation_days" type="text" inputmode="decimal" value="${p.vacation_days ?? ''}"
+          <input name="vacation_days" type="text" inputmode="decimal" value="${esc(p.vacation_days)}"
                  placeholder="leer = kein Konto" style="width:8rem"></label>
         <label class="small muted">Anspruch ab
-          <input name="vacation_start" type="date" value="${p.vacation_start || ''}" style="width:9.5rem"></label>
+          <input name="vacation_start" type="date" value="${esc(p.vacation_start)}" style="width:9.5rem"></label>
         <label class="small muted row" style="gap:.3rem"><input type="checkbox" name="vacation_paid"${p.vacation_paid ? ' checked' : ''}> bezahlt</label>
         <button class="ghost" type="submit">Speichern</button>
       </form>
@@ -848,9 +856,9 @@ async function renderUrlaub() {
 
   const erledigt = a => `<div class="row spread" style="padding:.35rem 0;border-top:1px solid var(--line)">
     <div>
-      <div>${a.user_name} · ${zeitraum(a)}</div>
+      <div>${esc(a.user_name)} · ${zeitraum(a)}</div>
       <div class="small muted">${a.days ? a.days + (a.days === 1 ? ' Tag' : ' Tage') + ' · ' : ''}${
-        { approved: 'genehmigt', declined: 'abgelehnt', cancelled: 'zurückgezogen' }[a.status] || a.status}${
+        { approved: 'genehmigt', declined: 'abgelehnt', cancelled: 'zurückgezogen' }[a.status] || esc(a.status)}${
         a.paid === 0 && a.status === 'approved' ? ' · unbezahlt' : ''}</div>
     </div>
     <div style="text-align:right">
@@ -872,7 +880,7 @@ async function renderUrlaub() {
         <form class="row" id="urlaubneu" style="margin-top:.5rem;flex-wrap:wrap">
           <select name="user_id" required>
             <option value="">Person wählen …</option>
-            ${mitKonto.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+            ${mitKonto.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}
           </select>
           <label class="small muted">Von <input name="von" type="date" required></label>
           <label class="small muted">Bis <input name="bis" type="date"></label>
@@ -912,9 +920,9 @@ async function renderKonto() {
         hier ist jeder Besucher angemeldet.</p>` : `
       <form id="kontoform">
         <p><label class="small muted">Name</label>
-           <input name="name" value="${(me.name || '').replace(/"/g, '&quot;')}" required style="width:100%"></p>
+           <input name="name" value="${esc(me.name)}" required style="width:100%"></p>
         <p><label class="small muted">E-Mail — damit melden Sie sich an</label>
-           <input name="email" type="email" value="${(me.email || '').replace(/"/g, '&quot;')}" required style="width:100%"></p>
+           <input name="email" type="email" value="${esc(me.email)}" required style="width:100%"></p>
         <p><label class="small muted">Neues Passwort <span class="muted">(leer lassen, wenn es bleiben soll)</span></label>
            <input name="password_neu" type="password" autocomplete="new-password" minlength="8" style="width:100%"></p>
         <p><label class="small muted">Bisheriges Passwort</label>
@@ -927,7 +935,7 @@ async function renderKonto() {
     </div>
     <div class="card">
       <h2>Betrieb</h2>
-      <p class="small muted">${tenant.name} · <code>${tenant.slug}</code></p>
+      <p class="small muted">${esc(tenant.name)} · <code>${esc(tenant.slug)}</code></p>
       <p class="small muted">Reinigungskräfte legen Sie im Reiter „Team" an — die melden sich
       nie an, sondern bekommen einen persönlichen Link.</p>
     </div>`;
@@ -1456,7 +1464,7 @@ function hinweisleiste() {
   // Derselbe Weg wie in der Mail — wer erst in der Anwendung darauf stößt, soll
   // nicht in seinem Postfach nach dem Link suchen müssen.
   const weiter = t.angebot_token
-    ? `<a class="btn primary small" href="/angebot/${t.angebot_token}">Weitermachen</a>`
+    ? `<a class="btn primary small" href="/angebot/${encodeURIComponent(t.angebot_token)}">Weitermachen</a>`
     : '';
 
   if (tenant.nur_lesbar) {

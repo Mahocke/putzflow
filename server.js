@@ -14,6 +14,9 @@ const { get, all, run, init } = dbmod;
 const billing = require('./src/billing');
 const jobsLogic = require('./src/jobs');
 const rundruf = require('./src/rundruf');
+const { anmeldeBremse, MELDUNG: BREMSE_MELDUNG } = require('./src/anmeldebremse');
+// Verwaltungs-Anmeldung: bis 23.11.2026 ohne jede Bremse (siehe src/anmeldebremse.js).
+const loginBremse = anmeldeBremse();
 // ⚠️ KEIN require auf ./src/betreiber, ./src/rechnung oder ./src/rechnungslauf.
 // Der Betreiberbereich ist ein optionales Modul und wird weiter unten in einem
 // try-Block geladen (Suchwort „Betreiberbereich"). Wer hier eine feste Zeile
@@ -121,6 +124,21 @@ for (const methode of ['get', 'post', 'put', 'patch', 'delete', 'all', 'use']) {
   )));
 }
 app.use(express.json({ limit: '256kb' }));
+// Strenge Content-Security-Policy für die drei ANWENDUNGS-Seiten (Verwaltung,
+// Magic-Link-Seite der Kräfte, Betreiberbereich). Dort steht kein eingebettetes
+// Skript, also darf nur geladen werden, was vom eigenen Host kommt. Rutscht je ein
+// Name oder eine Notiz ungeprüft in innerHTML, führt der Browser das eingeschleuste
+// Skript trotzdem nicht aus — die zweite Schicht hinter esc() (23.11.2026).
+// `style-src 'unsafe-inline'`, weil die Oberflächen mit style-Attributen arbeiten;
+// CSS kann keinen Code ausführen. Die Verkaufsseiten bekommen sie (noch) nicht —
+// sie haben eingebettete Skripte und die Besucherstatistik.
+const STRENGE_CSP = [
+  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:", "connect-src 'self'", "object-src 'none'",
+  "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'",
+].join('; ');
+const APP_SEITEN = new Set(['index.html', 'm.html', 'intern.html']);
+function strengeCsp(res) { res.setHeader('Content-Security-Policy', STRENGE_CSP); }
 // Browser-Sicherheitsgrenzen zentral setzen. Eine strikte CSP braucht zunächst
 // das Auslagern der bewusst eingebetteten Seitenskripte; die übrigen Header
 // sind dagegen kompatibel und verhindern MIME-Sniffing sowie Einbettung.
@@ -370,6 +388,7 @@ app.get('/m/:token', (req, res) => {
   const u = auth.userByMagicToken(req.params.token);
   noCacheHtml(res);
   if (!u) return res.status(404).send(page('Link ungültig', '<p>Dieser Link gilt nicht mehr. Bitte melden Sie sich bei Ihrer Ansprechpartnerin.</p>'));
+  strengeCsp(res);
   res.sendFile(path.join(PUBLIC, 'm.html'));
 });
 
@@ -1764,10 +1783,14 @@ app.get('/api/export/daten.json', requireTenant, auth.requireAdmin, (req, res) =
 // ===========================================================================
 app.post('/api/login', requireTenant, (req, res) => {
   const email = String(req.body.email || '').toLowerCase().trim();
+  const konto = `${req.tenant.id}:${email}`;
+  if (loginBremse.gesperrt(req.ip, konto)) return res.status(429).json({ error: BREMSE_MELDUNG });
   const u = get(`SELECT * FROM users WHERE tenant_id = ? AND email = ? AND active = 1`, req.tenant.id, email);
   if (!u || !auth.verifyPassword(req.body.password || '', u.password_hash)) {
+    loginBremse.fehlschlag(req.ip, konto);
     return res.status(401).json({ error: 'E-Mail oder Passwort stimmt nicht' });
   }
+  loginBremse.erfolg(req.ip);
   const { raw, expires } = auth.createSession(req.tenant.id, u.id);
   auth.setCookie(res, raw, expires);
   res.json({ ok: true, me: { name: u.name, role: u.role } });
@@ -3025,7 +3048,7 @@ function notifyAdmins(tenant, subject, text) {
 // Jetzt gilt: Datei weg = erwarteter Zustand, Hinweis. Datei da = geladen, und
 // JEDER Fehler darin bricht den Start laut ab.
 if (require('fs').existsSync(path.join(__dirname, 'src', 'betreiber.js'))) {
-  require('./src/betreiber').routen(app, { noCacheHtml, PUBLIC });
+  require('./src/betreiber').routen(app, { noCacheHtml, PUBLIC, strengeCsp });
 } else {
   console.log('[start] Betreiberbereich nicht installiert — Kern läuft ohne.');
 }
@@ -3036,11 +3059,15 @@ if (require('fs').existsSync(path.join(__dirname, 'src', 'betreiber.js'))) {
 // Landing-Route unten kommt nie zum Zug (Apex bekäme die Verwaltungs-Oberfläche).
 app.use(express.static(PUBLIC, {
   index: false, etag: true, maxAge: '0',
-  setHeaders(res, file) { if (file.endsWith('.html')) noCacheHtml(res); },
+  setHeaders(res, file) {
+    if (file.endsWith('.html')) noCacheHtml(res);
+    if (APP_SEITEN.has(path.basename(file))) strengeCsp(res);
+  },
 }));
 
 app.get('/', (req, res) => {
   noCacheHtml(res);
+  if (req.tenant) strengeCsp(res);
   res.sendFile(path.join(PUBLIC, req.tenant ? 'index.html' : 'landing.html'));
 });
 

@@ -192,8 +192,8 @@ function urlaubKarte(u) {
     return `<div class="row spread" style="padding:.35rem 0;border-top:1px solid var(--line)">
       <div>
         <div>${zeitraum}</div>
-        <div class="small muted">${a.days ? a.days + (a.days === 1 ? ' Tag' : ' Tage') + ' · ' : ''}${zustand[a.status] || a.status}${
-          a.status === 'declined' && a.decline_reason ? ' · ' + a.decline_reason : ''}</div>
+        <div class="small muted">${a.days ? a.days + (a.days === 1 ? ' Tag' : ' Tage') + ' · ' : ''}${zustand[a.status] || esc(a.status)}${
+          a.status === 'declined' && a.decline_reason ? ' · ' + esc(a.decline_reason) : ''}</div>
       </div>
       <div style="text-align:right">
         ${a.status === 'approved' && a.paid && a.pay_cents ? `<div><strong>${euro(a.pay_cents)}</strong></div>` : ''}
@@ -240,7 +240,7 @@ function auslagenKarte(a) {
   if (!a) return '';
   const zeile = p => `<div class="row spread" style="padding:.35rem 0;border-top:1px solid var(--line)">
       <div>
-        <div>${p.beschreibung}</div>
+        <div>${esc(p.beschreibung)}</div>
         <div class="small muted">${fmtTag(p.date)}${p.minutes ? ' · ' + hhmm(p.minutes) : ''}
           ${p.zustand === 'offen' ? '· wartet auf Freigabe'
             : p.zustand === 'abgelehnt' ? '· nicht anerkannt' : '· freigegeben'}</div>
